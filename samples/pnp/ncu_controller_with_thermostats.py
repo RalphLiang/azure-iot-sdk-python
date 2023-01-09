@@ -7,6 +7,7 @@ import os
 import asyncio
 import random
 import logging
+import subprocess
 
 from azure.iot.device.aio import IoTHubDeviceClient
 from azure.iot.device.aio import ProvisioningDeviceClient
@@ -369,24 +370,28 @@ async def main():
         print("Sending telemetry from various components")
 
         while True:
-            curr_temp_ext = random.randrange(10, 50)
+            # 調整成收集 記憶體 使用量，最大值 100%
+            cmd = "free -m | awk 'NR==2{printf \"%d\", $3*100/$2 }'"
+            curr_temp_ext = int(subprocess.check_output(cmd, shell = True))
             THERMOSTAT_1.record(curr_temp_ext)
 
-            temperature_msg1 = {"temperature": curr_temp_ext}
+            temperature_msg1 = {"Mem Usage(%)": curr_temp_ext}
             await send_telemetry_from_temp_controller(
                 device_client, temperature_msg1, thermostat_1_component_name
             )
-
-            curr_temp_int = random.randrange(10, 50)  # Current temperature in Celsius
+            # 調整成收集 磁碟空間 使用量，最大值 100%
+            cmd = "df -h | awk '$NF==\"/\"{printf \"%d\", $5}'"
+            curr_temp_int = int(subprocess.check_output(cmd, shell = True))
             THERMOSTAT_2.record(curr_temp_int)
 
-            temperature_msg2 = {"temperature": curr_temp_int}
-
+            temperature_msg2 = {"Disk Usage(%)": curr_temp_int}
             await send_telemetry_from_temp_controller(
                 device_client, temperature_msg2, thermostat_2_component_name
             )
-
-            workingset_msg3 = {"workingSet": random.randrange(1, 100)}
+            # 調整成收集 CPU 使用量，最大值 400
+            cmd = "top -bn1 | grep load | awk '{printf \"%d\", $(NF-2)*100}'"
+            curr_temp_cpu = subprocess.check_output(cmd, shell = True )
+            workingset_msg3 = {"CPU Loading": int(curr_temp_cpu)}
             await send_telemetry_from_temp_controller(device_client, workingset_msg3)
 
     send_telemetry_task = asyncio.ensure_future(send_telemetry())
